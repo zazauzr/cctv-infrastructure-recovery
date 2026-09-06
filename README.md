@@ -104,7 +104,7 @@ PoE Port 2 Status OID response: deliveringPower
 * **Cable Management Discipline:** Zip-ties should never be over-torqued on structural runs. Hook-and-loop (Velcro) straps or loose-loop zip-ties prevent mechanical core severance.
 * **Isolate Variables Systematically:** Benchtop direct connection ("testing on the knee") saved hours by verifying camera hardware health independently from structured cabling.
 * **Component-Level Switch Port Vulnerability:** A short circuit on an edge link can destroy an individual switch port's PoE delivery chip while data switching and neighbor ports continue functioning normally.
-##License
+## License
 Copyright (c) 2026 zazauzr. All rights reserved.
 This repository and all its contents (including documentation, scripts, and configuration files) are proprietary and confidential. 
 Unauthorized copying, distribution, modification, public display, or commercial use of any materials from this repository, via any medium, is strictly prohibited without the express prior written permission of the copyright holder.
