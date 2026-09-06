@@ -1,98 +1,93 @@
 # Edge CCTV Infrastructure Recovery: Physical Layer Fault Isolation & Topology Remediation
 
-A production post-mortem, incident resolution log, and automated verification suite addressing an edge IP camera outage caused by physical cable mechanical failure, terminal short-circuiting, and switch-port PoE controller degradation.
+A production post-mortem, incident resolution log, and automated verification suite addressing an edge IP camera outage caused by cable mechanical compression (over-tensioned zip-tie), core breakage, and subsequent PoE controller degradation.
 
 ## Overview & Business Context
 
 ### The Challenge
-A critical security camera in an enterprise physical access control perimeter went offline (`DOWN`). Remote administrative actions—including soft reboots and hardware PoE power-cycling on the managed switch—failed to restore link negotiation or device telemetry.
+A critical edge surveillance camera went offline (`DOWN`). Remote management operations—including software restarts and remote PoE power-cycling via the managed switch—failed to bring the link back up.
 
 ### The Business Impact
-Loss of real-time perimeter surveillance posed a compliance breach under regional physical access auditing standards. Immediate recovery of L1–L7 connectivity was required without replacing functional high-cost edge sensors.
+Loss of perimeter surveillance posed an operational vulnerability and compliance risk. Rapid triage and physical-layer recovery were required to restore streaming services without unnecessary hardware replacement.
 
-## Architecture & Technology Stack
+## Diagnostic Evidence & Architecture
 
 ```text
-[ PoE Switch ]
+[ PoE Switch (53.5V PSE) ]
       │
-      ├─ [ Port 1 (Faulty/Disabled) ] ──x (Short circuit)
+      ├─ [ Port 1 (Blown Controller) ] ──x (Short-circuit event)
       │
       └─ [ Port 2 (Active PoE 802.3af) ]
             │
-            └── [ Cat5e/6 UTP 23AWG (T-568B) ~15m ] ──► [ IP Camera (192.168.1.120) ]
-                                                              │ (RTSP Stream)
-                                                              ▼
-                                                    [ NVR / VMS Collector ]
+            └── [ Cat5e/6 UTP 23AWG (T-568B) ] ──► [ IP Camera (Direct Link) ]
+                                                          │ (RTSP Stream)
+                                                          ▼
+                                                [ Surveillance Platform ]
 ```
 
-* **Layer 1 (Physical):** Cat5e/6 Pure Copper (CU) 23AWG, T-568B termination standard, IP67 waterproof strain relief.
-* **Layer 2 (Data Link / Power):** IEEE 802.3af/at Power over Ethernet (PoE), 10/100/1000BASE-T RJ-45 switching.
-* **Layer 3/4 (Network/Transport):** IPv4, TCP, ICMP, SNMPv2c.
-* **Layer 7 (Application):** RTSP (Real-Time Streaming Protocol), ONVIF Profile S.
-* **Tooling:** Network Cable Master/Remote Tester, Advanced IP Scanner, `nmap`, `ffprobe`, `snmpget`, Bash.
+### Physical Layer Inspection
+
+| Defect Identification | Hardware Continuity Verification |
+| :---: | :---: |
+| ![Mechanical Compression](01-cable-tie-mechanical-pinch.jpg) | ![Tester OK](02-continuity-hardware-test.jpg) |
+| *Root Cause: High mechanical strain and sheath puncture caused by over-torqued cable tie* | *L1 Verification: Sequential 1-8 pin pass confirmed on rebuilt termination* |
+
+| Benchtop Direct PoE Verification | Switch Port Reallocation |
+| :---: | :---: |
+| ![Direct PoE Link](03-direct-benchtop-poe-link.jpg) | ![Port Migration](04-switch-port-migration.jpg) |
+| *Direct bench test: PoE delivery confirmed via active link/power LED indicator* | *Port migration: Cable reallocated from dead Port 1 to operational Port 2* |
 
 ## Root Cause Analysis (RCA)
 
-A multi-factor compounding fault masked the underlying issues during standard telemetry inspections:
+Investigation isolated three distinct issues masking the true point of failure:
 
-1. **Mechanical Stress & Core Rupture:** Over-torqued cable fasteners caused structural pinching along the perimeter cable tray, severing Core 8 (Brown) and inducing an intermittent short circuit between pairs 7-8 and adjacent pairs.
-2. **Controller Port Lockout / Failure:** The intermittent short circuit tripped the PoE port protection circuit on Switch Port 1, causing irreversible hardware controller fault on that specific port while the rest of the managed switch chassis continued normal operation.
-3. **Tooling Anomaly:** Mid-incident failure of mechanical crimping equipment caused improper pin seated depth, producing transient opens on Pin 8 during initial replacement patches.
+1. **Mechanical Stress & Core Severance (Primary Root Cause):** 
+   During original installation, a nylon zip-tie was over-tensioned across the internal mounting bracket. Over time, thermal cycles and static strain cut through the outer jacket, pinching internal conductors. This caused an open fault on Core 8 (Brown) and an intermittent internal short circuit across PoE delivery conductors.
+2. **Switch Port PoE Controller Lockout:** 
+   The line short-circuit caused a hardware failure on Switch Port 1's PSE controller. While adjacent switch ports operated normally, Port 1 permanently failed to negotiate 802.3af handshakes.
+3. **Tooling Anomaly:** 
+   Mid-triage mechanical failure of the initial crimping tool introduced uneven pin seating depths, producing transient open circuits before a calibrated replacement crimper was deployed.
 
-## Incident Remediation Workflow
+## Remediation Workflow
 
 ### 1. Isolated Benchtop Diagnostics
-* Dismounted edge unit and established direct back-to-back link to the switch fabric using a certified reference patch cord.
-* Confirmed camera logic and sensor were fully operational, ruling out optical or motherboard failure.
+* Dismounted edge unit and established a direct patch connection straight into the switch rack.
+* Verified sensor integrity and system firmware, eliminating device-level failure.
 
 ### 2. Physical Layer Reconstruction
-* Spliced and re-pulled an insulated 15-meter run of pure copper (CU) 23AWG unshielded twisted pair to preserve signal integrity and eliminate resistance voltage drops under load.
-* Terminated both ends under the **ANSI/TIA-568-B** standard:
+* Cleared damaged cable segments.
+* Re-terminated lines to the **ANSI/TIA-568-B** standard using verified pure copper conductors:
   ```text
   Pin 1: White-Orange  | Pin 5: White-Blue
   Pin 2: Orange        | Pin 6: Green
   Pin 3: White-Green   | Pin 7: White-Brown
   Pin 4: Blue          | Pin 8: Brown
   ```
-* Verified all 8 cores end-to-end via hardware sequential pin tester (1 through 8 continuous).
+* Verified full 8-pin continuity with hardware sequential master/remote testing.
 
-### 3. Port Migration & Reconfiguration
-* Identified silent hardware failure on switch port 1.
-* Reallocated the cable drop to switch port 2.
-* Configured port isolation, set dynamic PoE priority to High, and labeled port 1 as defective for scheduled board-level maintenance.
-* Sealed edge terminations inside an IP67-rated waterproof compression gland.
+### 3. Port Migration & Commissioning
+* Migrated connection from defective Port 1 to verified PoE Port 2.
+* Confirmed PoE link negotiation via LED feedback and IP network discovery.
+* Re-installed edge unit with service loops and calibrated, finger-tight cable management to prevent localized strain.
 
-## Deployment & Verification
+## Automated Verification Suite
 
-### Prerequisites
-* `bash` 4.0+
-* `ffmpeg` / `ffprobe`
-* `snmp` (optional, for MIB checks)
-* `iputils-ping`
+A diagnostic script (`monitor_camera.sh`) is provided to validate the operational status across L3, SNMP PoE state, and L7 media streaming.
 
-### Quickstart
-1. Clone this repository:
-   ```bash
-   git clone https://github.com
-   cd cctv-infrastructure-recovery
-   ```
-2. Make the verification script executable:
-   ```bash
-   chmod +x monitor_camera.sh
-   ```
-3. Set deployment parameters and run verification:
-   ```bash
-   export CAMERA_IP="192.168.1.120"
-   export RTSP_USER="svc_cctv_collector"
-   export RTSP_PASSWORD="EncryptedSecretHere"
-   export RTSP_PATH="/Streaming/Channels/101"
-   export SWITCH_IP="192.168.1.2"
-   export PORT_INDEX="2"
+```bash
+# Export runtime variables
+export CAMERA_IP="192.168.1.120"
+export RTSP_USER="cctv_admin"
+export RTSP_PASSWORD="EncryptedSecretHere"
+export RTSP_PATH="/live/ch0"
+export SWITCH_IP="192.168.1.2"
+export PORT_INDEX="2"
 
-   ./monitor_camera.sh
-   ```
+# Execute suite
+./monitor_camera.sh
+```
 
-### Verification Output
+### Expected Output
 ```text
 === [1/3] Checking ICMP Reachability ===
 [OK] Host 192.168.1.120 is reachable via ICMP.
@@ -106,7 +101,10 @@ PoE Port 2 Status OID response: deliveringPower
 
 ## Key Lessons Learned
 
-* **Avoid Single-Port Assumptions:** Never assume a switch has survived a cable-level short circuit simply because adjacent chassis ports remain operational. Test against adjacent known-good ports early.
-* **Bench Isolation First:** Testing devices directly against the network core ("on-the-bench" test) instantly eliminates 50% of unknown variables in hybrid power/data failures.
-* **Copper Quality Matters:** High-grade 23AWG pure copper runs reduce resistance and prevent thermal throttling when operating high-draw IR illuminators over standard distances.
-
+* **Cable Management Discipline:** Zip-ties should never be over-torqued on structural runs. Hook-and-loop (Velcro) straps or loose-loop zip-ties prevent mechanical core severance.
+* **Isolate Variables Systematically:** Benchtop direct connection ("testing on the knee") saved hours by verifying camera hardware health independently from structured cabling.
+* **Component-Level Switch Port Vulnerability:** A short circuit on an edge link can destroy an individual switch port's PoE delivery chip while data switching and neighbor ports continue functioning normally.
+##License
+Copyright (c) 2026 zazauzr. All rights reserved.
+This repository and all its contents (including documentation, scripts, and configuration files) are proprietary and confidential. 
+Unauthorized copying, distribution, modification, public display, or commercial use of any materials from this repository, via any medium, is strictly prohibited without the express prior written permission of the copyright holder.
